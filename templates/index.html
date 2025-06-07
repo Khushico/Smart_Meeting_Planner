@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Meeting Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Meeting Planner</h1>
+        
+        <div class="section">
+            <h2>1. Input User Busy Times</h2>
+            <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                📝 Paste your JSON data below. The system will analyze busy times for all users.
+            </p>
+            <textarea id="jsonInput" placeholder='Loading example data...'></textarea>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button onclick="submitSlots()">🚀 Submit User Data</button>
+                <button onclick="loadExampleData()" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);">
+                    📋 Load Example
+                </button>
+                <small style="color: #666; margin-left: 10px;">
+                    💡 Tip: Use Ctrl+Enter to quick submit
+                </small>
+            </div>
+            <div id="submitResult" class="result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>2. Find Meeting Suggestions</h2>
+            <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                🔍 Specify meeting duration to find available time slots for all users.
+            </p>
+            <div class="input-group">
+                <label for="duration">⏱️ Meeting Duration (minutes):</label>
+                <input type="number" id="duration" value="30" min="15" max="480" step="15">
+                <button onclick="getSuggestions()">🎯 Get Suggestions</button>
+                <small style="color: #666;">
+                    💡 Tip: Use Ctrl+S to quick search
+                </small>
+            </div>
+            
+            <div id="suggestions" class="suggestions">
+                <h3>⏰ Available Time Slots</h3>
+                <table id="suggestionsTable">
+                    <thead>
+                        <tr>
+                            <th>Slot #</th>
+                            <th>Time Range</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="3" style="text-align: center; color: #999; padding: 30px;">Submit user data and click "Get Suggestions" to see available slots</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>3. View User Calendar</h2>
+            <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                👤 View individual user schedules including busy times and booked meetings.
+            </p>
+            <div class="input-group">
+                <label for="userId">👤 User ID:</label>
+                <input type="number" id="userId" value="1" min="1" max="999">
+                <button onclick="getCalendar()">📅 View Calendar</button>
+            </div>
+            <div id="calendarResult" class="result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>4. System Controls</h2>
+            <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                🛠️ Utility functions for testing and data management.
+            </p>
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <button onclick="resetData()" class="reset-btn">🗑️ Reset All Data</button>
+                <small style="color: #999;">
+                    ⚠️ This will clear all users and meetings
+                </small>
+            </div>
+            <div id="resetResult" class="result"></div>
+        </div>
+        
+        <!-- Hidden elements for better UX -->
+        <div style="position: fixed; bottom: 20px; right: 20px; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); padding: 15px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); font-size: 12px; color: #666; max-width: 250px; display: none;" id="helpTooltip">
+            <strong>💡 Quick Tips:</strong><br>
+            • Ctrl+Enter: Submit data<br>
+            • Ctrl+S: Get suggestions<br>
+            • Working hours: 09:00-18:00 IST
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <!-- Add some extra interactivity -->
+    <script>
+        // Show help tooltip on first visit
+        setTimeout(() => {
+            const tooltip = document.getElementById('helpTooltip');
+            tooltip.style.display = 'block';
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                tooltip.style.transition = 'all 0.4s ease';
+                tooltip.style.opacity = '1';
+                tooltip.style.transform = 'translateY(0)';
+            }, 100);
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                tooltip.style.opacity = '0';
+                tooltip.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    tooltip.style.display = 'none';
+                }, 400);
+            }, 5000);
+        }, 3000);
+        
+        // Add some particle effects on page load
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.style.position = 'fixed';
+            particle.style.width = '4px';
+            particle.style.height = '4px';
+            particle.style.background = 'rgba(102, 126, 234, 0.6)';
+            particle.style.borderRadius = '50%';
+            particle.style.pointerEvents = 'none';
+            particle.style.left = Math.random() * window.innerWidth + 'px';
+            particle.style.top = window.innerHeight + 'px';
+            particle.style.zIndex = '-1';
+            document.body.appendChild(particle);
+            
+            const animation = particle.animate([
+                { transform: 'translateY(0px) scale(1)', opacity: 0.6 },
+                { transform: `translateY(-${window.innerHeight + 100}px) scale(0)`, opacity: 0 }
+            ], {
+                duration: 3000 + Math.random() * 2000,
+                easing: 'ease-out'
+            });
+            
+            animation.onfinish = () => particle.remove();
+        }
+        
+        // Create floating particles occasionally
+        setInterval(createParticle, 2000);
+    </script>
+</body>
+</html>            <div id="resetResult" class="result"></div>
+        </div>
+        
+        <!-- Additional Features Section -->
+        <div class="section">
+            <h2>5. Quick Actions</h2>
+            <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                ⚡ Streamlined workflows for common tasks.
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <button onclick="quickDemo()" style="background: linear-gradient(135deg, #a8e6cf 0%, #4ecdc4 100%);">
+                    🎬 Run Quick Demo
+                </button>
+                <button onclick="validateJSON()" style="background: linear-gradient(135deg, #ffd93d 0%, #ff6b6b 100%);">
+                    ✅ Validate JSON
+                </button>
+                <button onclick="exportData()" style="background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);">
+                    💾 Export Data
+                </button>
+                <button onclick="toggleDarkMode()" style="background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);">
+                    🌙 Toggle Theme
+                </button>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div style="position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); padding: 10px 20px; border-top: 1px solid rgba(102, 126, 234, 0.2); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #666; z-index: 1000;" id="statusBar">
+            <div>
+                <span id="connectionStatus">🟢 Connected</span> | 
+                <span id="dataStatus">📊 No data loaded</span>
+            </div>
+            <div>
+                <span>⏰ Working Hours: 09:00-18:00 IST</span> | 
+                <span id="currentTime"></span>
+            </div>
+        </div>
+        
+        <!-- Hidden elements for better UX -->
+        <div style="position: fixed; bottom: 80px; right: 20px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); padding: 15px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); font-size: 12px; color: #666; max-width: 280px; display: none; border: 1px solid rgba(102, 126, 234, 0.2);" id="helpTooltip">
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 16px; margin-right: 8px;">💡</span>
+                <strong style="color: #2c3e50;">Quick Tips</strong>
+                <button onclick="closeTooltip()" style="margin-left: auto; background: none; border: none; font-size: 16px; cursor: pointer; padding: 0; color: #999;">×</button>
+            </div>
+            <div style="line-height: 1.4;">
+                • <kbd>Ctrl+Enter</kbd>: Submit data<br>
+                • <kbd>Ctrl+S</kbd>: Get suggestions<br>
+                • Working hours: 09:00-18:00 IST<br>
+                • All times use 24-hour format<br>
+                • Booked meetings apply to all users
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(102, 126, 234, 0.9); backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; z-index: 9999; flex-direction: column;">
+            <div style="text-align: center; color: white;">
+                <div style="width: 60px; height: 60px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <h3 style="margin: 0 0 10px 0;">Processing...</h3>
+                <p style="margin: 0; opacity: 0.8;" id="loadingText">Please wait while we process your request</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <!-- Enhanced interactivity and animations -->
+    <script>
+        // Status bar updates
+        function updateStatusBar() {
+            const currentTime = new Date().toLocaleTimeString('en-US', { 
+                timeZone: 'Asia/Kolkata',
+                hour12: false 
+            });
+            document.getElementById('currentTime').textContent = `🕐 ${currentTime} IST`;
+        }
+        
+        // Update time every second
+        setInterval(updateStatusBar, 1000);
+        updateStatusBar();
+        
+        // Enhanced tooltip management
+        function closeTooltip() {
+            const tooltip = document.getElementById('helpTooltip');
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                tooltip.style.display = 'none';
+            }, 300);
+        }
+        
+        // Show help tooltip on first visit
+        setTimeout(() => {
+            const tooltip = document.getElementById('helpTooltip');
+            tooltip.style.display = 'block';
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                tooltip.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                tooltip.style.opacity = '1';
+                tooltip.style.transform = 'translateY(0)';
+            }, 100);
+            
+            // Auto-hide after 6 seconds
+            setTimeout(() => {
+                if (tooltip.style.display !== 'none') {
+                    closeTooltip();
+                }
+            }, 6000);
+        }, 2000);
+        
+        // Loading overlay functions
+        function showLoadingOverlay(text = 'Processing...') {
+            const overlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            loadingText.textContent = text;
+            overlay.style.display = 'flex';
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.transition = 'opacity 0.3s ease';
+                overlay.style.opacity = '1';
+            }, 10);
+        }
+        
+        function hideLoadingOverlay() {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        }
+        
+        // Quick action functions
+        async function quickDemo() {
+            showLoadingOverlay('Running demonstration...');
+            
+            try {
+                // Step 1: Load example data
+                loadExampleData();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Step 2: Submit data
+                await submitSlots();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Step 3: Get suggestions
+                await getSuggestions();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Step 4: Show calendar
+                await getCalendar();
+                
+                showResult('submitResult', '🎉 Demo completed! All features demonstrated successfully.', 'success');
+            } catch (error) {
+                showResult('submitResult', `❌ Demo failed: ${error.message}`, 'error');
+            } finally {
+                hideLoadingOverlay();
+            }
+        }
+        
+        function validateJSON() {
+            const jsonInput = document.getElementById('jsonInput').value.trim();
+            
+            if (!jsonInput) {
+                showResult('submitResult', '❌ No JSON to validate', 'error');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(jsonInput);
+                
+                // Validate structure
+                if (!data.users || !Array.isArray(data.users)) {
+                    throw new Error('JSON must contain a "users" array');
+                }
+                
+                data.users.forEach((user, index) => {
+                    if (!user.id) {
+                        throw new Error(`User at index ${index} missing "id" field`);
+                    }
+                    if (user.busy && !Array.isArray(user.busy)) {
+                        throw new Error(`User ${user.id}: "busy" must be an array`);
+                    }
+                });
+                
+                showResult('submitResult', `✅ JSON is valid! Found ${data.users.length} user(s)`, 'success');
+                
+            } catch (error) {
+                showResult('submitResult', `❌ Invalid JSON: ${error.message}`, 'error');
+            }
+        }
+        
+        function exportData() {
+            const jsonInput = document.getElementById('jsonInput').value.trim();
+            
+            if (!jsonInput) {
+                showResult('submitResult', '❌ No data to export', 'error');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(jsonInput);
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `meeting-planner-data-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showResult('submitResult', '✅ Data exported successfully!', 'success');
+            } catch (error) {
+                showResult('submitResult', `❌ Export failed: ${error.message}`, 'error');
+            }
+        }
+        
+        let isDarkMode = false;
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            
+            if (isDarkMode) {
+                document.body.style.background = 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)';
+                document.querySelectorAll('.section').forEach(section => {
+                    section.style.background = 'rgba(52, 73, 94, 0.95)';
+                    section.style.color = '#ecf0f1';
+                });
+                showResult('submitResult', '🌙 Dark mode enabled', 'info');
+            } else {
+                document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                document.querySelectorAll('.section').forEach(section => {
+                    section.style.background = 'rgba(255, 255, 255, 0.95)';
+                    section.style.color = '#333';
+                });
+                showResult('submitResult', '☀️ Light mode enabled', 'info');
+            }
+        }
+        
+        // Enhanced particle system
+        function createParticle() {
+            const particle = document.createElement('div');
+            const colors = ['rgba(102, 126, 234, 0.6)', 'rgba(118, 75, 162, 0.6)', 'rgba(255, 107, 107, 0.4)'];
+            
+            particle.style.position = 'fixed';
+            particle.style.width = (Math.random() * 6 + 2) + 'px';
+            particle.style.height = particle.style.width;
+            particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+            particle.style.borderRadius = '50%';
+            particle.style.pointerEvents = 'none';
+            particle.style.left = Math.random() * window.innerWidth + 'px';
+            particle.style.top = window.innerHeight + 'px';
+            particle.style.zIndex = '-1';
+            document.body.appendChild(particle);
+            
+            const animation = particle.animate([
+                { 
+                    transform: 'translateY(0px) scale(1) rotate(0deg)', 
+                    opacity: 0.6 
+                },
+                { 
+                    transform: `translateY(-${window.innerHeight + 100}px) scale(0) rotate(360deg)`, 
+                    opacity: 0 
+                }
+            ], {
+                duration: 4000 + Math.random() * 3000,
+                easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+            });
+            
+            animation.onfinish = () => particle.remove();
+        }
+        
+        // Create floating particles
+        setInterval(createParticle, 3000);
+        
+        // Update data status when data changes
+        function updateDataStatus(message) {
+            document.getElementById('dataStatus').textContent = message;
+        }
+        
+        // Enhanced keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'Enter':
+                        e.preventDefault();
+                        submitSlots();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        getSuggestions();
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        if (confirm('Reset all data?')) {
+                            resetData();
+                        }
+                        break;
+                    case 'h':
+                        e.preventDefault();
+                        const tooltip = document.getElementById('helpTooltip');
+                        if (tooltip.style.display === 'none') {
+                            tooltip.style.display = 'block';
+                            setTimeout(() => {
+                                tooltip.style.opacity = '1';
+                                tooltip.style.transform = 'translateY(0)';
+                            }, 10);
+                        } else {
+                            closeTooltip();
+                        }
+                        break;
+                }
+            }
+        });
+        
+        // Page visibility API for better performance
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Pause animations when tab is not visible
+                document.body.style.animationPlayState = 'paused';
+            } else {
+                document.body.style.animationPlayState = 'running';
+                updateStatusBar();
+            }
+        });
+    </script>
+</body>
+</html>
